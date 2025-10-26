@@ -1,0 +1,17 @@
+[package]
+name = "memomint"
+edition = "2024.beta"
+license = "MIT"
+authors = ["MemoMint Team"]
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/devnet" }
+# Walrus storage is abstracted through JournalEntry object
+# No explicit Walrus dependency needed - Sui handles object storage
+
+[addresses]
+memomint = "0x0"
+
+[dev-addresses]
+# Dev addresses for testing
+

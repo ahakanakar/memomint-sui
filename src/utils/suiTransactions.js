@@ -9,9 +9,10 @@ import { Transaction } from '@mysten/sui/transactions';
 
 /**
  * Package ID for the deployed MemoMint Move contract
- * Replace this with the actual package ID after publishing the contract
+ * Deployed on Sui Devnet
+ * Transaction: AiGeMFAeqfJ8EqXS4ob7cEbyW2c79JXWUND98y5jmRhj
  */
-export const PACKAGE_ID = '0xPLACEHOLDER_PACKAGE_ID';
+export const PACKAGE_ID = '0x1ed1e0ffe3aeb36507b17db20e4876ed093cdcbf644268de95e17697144c0510';
 
 /**
  * Mint a Memory NFT on Sui blockchain
@@ -53,9 +54,19 @@ export async function mintNFT({
   // Check if package ID is configured
   if (PACKAGE_ID === '0xPLACEHOLDER_PACKAGE_ID') {
     console.warn(
-      'Package ID not configured. Using placeholder for demo. ' +
-      'To enable real minting, publish the Move contract and update PACKAGE_ID.'
+      '⚠️ Package ID not configured - Using DEMO MODE'
     );
+    
+    // Return demo/mock result
+    console.log('🎭 Demo Mode: Simulating NFT mint...');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate delay
+    
+    return {
+      success: true,
+      digest: '0xDEMO' + Math.random().toString(36).substring(2, 15),
+      nftObjectId: '0xDEMONFT' + Math.random().toString(36).substring(2, 15),
+      effects: { created: [] },
+    };
   }
 
   try {
@@ -63,6 +74,12 @@ export async function mintNFT({
     console.log('Journal Entry:', journalEntry.substring(0, 50) + '...');
     console.log('Sentiment:', sentiment);
     console.log('User Address:', userAddress);
+    
+    // Check if signAndExecuteTransaction is available
+    if (!signAndExecuteTransaction || typeof signAndExecuteTransaction !== 'function') {
+      console.error('❌ signAndExecuteTransaction not available');
+      throw new Error('Wallet not connected. Please try signing in again.');
+    }
 
     // Create a new transaction
     const tx = new Transaction();
@@ -80,41 +97,74 @@ export async function mintNFT({
     console.log('📝 Transaction created, waiting for user signature...');
 
     // Sign and execute the transaction
-    const result = await signAndExecuteTransaction(
-      {
-        transaction: tx,
-        options: {
-          showEffects: true,
-          showObjectChanges: true,
+    return new Promise((resolve, reject) => {
+      signAndExecuteTransaction(
+        {
+          transaction: tx,
+          options: {
+            showEffects: true,
+            showObjectChanges: true,
+          },
         },
-      },
-      {
-        onSuccess: (result) => {
-          console.log('✅ Transaction successful!');
-          console.log('Digest:', result.digest);
-        },
-      }
-    );
+        {
+          onSuccess: (result) => {
+            console.log('✅ Transaction successful!');
+            console.log('Result:', result);
+            console.log('Digest:', result?.digest);
 
-    console.log('🎉 NFT minted successfully!');
-    console.log('Transaction digest:', result.digest);
+            try {
+              // Extract created objects (the NFT)
+              const createdObjects = result?.effects?.created || result?.objectChanges || [];
+              console.log('Created objects:', createdObjects);
+              
+              let nftObject = null;
+              
+              // Try to find NFT from objectChanges first
+              if (result?.objectChanges) {
+                nftObject = result.objectChanges.find(obj => 
+                  obj.type === 'created' && 
+                  obj.objectType && 
+                  obj.objectType.includes('MemoryNFT')
+                );
+              }
+              
+              // Fallback to effects.created
+              if (!nftObject && result?.effects?.created) {
+                nftObject = result.effects.created.find(obj => 
+                  obj.owner && 
+                  (typeof obj.owner === 'object' && obj.owner.AddressOwner)
+                );
+              }
 
-    // Extract created objects (the NFT)
-    const createdObjects = result.effects?.created || [];
-    const nftObject = createdObjects.find(obj => 
-      obj.owner && typeof obj.owner === 'object' && obj.owner.AddressOwner
-    );
+              if (nftObject) {
+                console.log('🖼️  NFT Object:', nftObject);
+              }
 
-    if (nftObject) {
-      console.log('🖼️  NFT Object ID:', nftObject.reference.objectId);
-    }
-
-    return {
-      success: true,
-      digest: result.digest,
-      nftObjectId: nftObject?.reference?.objectId,
-      effects: result.effects,
-    };
+              const nftId = nftObject?.objectId || nftObject?.reference?.objectId || null;
+              
+              resolve({
+                success: true,
+                digest: result?.digest || 'no-digest',
+                nftObjectId: nftId,
+                effects: result?.effects,
+              });
+            } catch (parseError) {
+              console.error('Error parsing result:', parseError);
+              resolve({
+                success: true,
+                digest: result?.digest || 'no-digest',
+                nftObjectId: null,
+                effects: result?.effects,
+              });
+            }
+          },
+          onError: (error) => {
+            console.error('❌ Transaction error:', error);
+            reject(error);
+          },
+        }
+      );
+    });
 
   } catch (error) {
     console.error('❌ Minting failed:', error);

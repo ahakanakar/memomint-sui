@@ -21,6 +21,7 @@ export function useEnokiAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [zkLoginSession, setZkLoginSession] = useState(null);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
 
   /**
    * Sign in with Google using zkLogin
@@ -32,14 +33,20 @@ export function useEnokiAuth() {
    * 3. Derive the actual zkLogin address
    */
   const signInWithGoogle = useCallback(() => {
+    // Show Google account selection modal first
+    setShowGoogleModal(true);
+  }, []);
+
+  const completeGoogleSignIn = useCallback((selectedAccount) => {
+    // Demo mode: API key check removed - using mock authentication
     if (!enokiConfig.apiKey) {
-      setError('Enoki API key not configured. Please add VITE_ENOKI_API_KEY to your .env file.');
-      return;
+      console.log('🎭 Demo Mode: Using mock authentication (no Enoki API key needed)');
     }
 
     try {
       setIsLoading(true);
       setError(null);
+      setShowGoogleModal(false);
 
       // Generate a nonce for security
       const nonce = generateRandomNonce();
@@ -47,21 +54,19 @@ export function useEnokiAuth() {
       // Store nonce for verification
       sessionStorage.setItem('zklogin_nonce', nonce);
       sessionStorage.setItem('zklogin_redirect_url', enokiConfig.redirectUrl);
+      sessionStorage.setItem('selected_account', selectedAccount);
 
-      // For demo purposes, we'll simulate the auth flow
-      // In production, this would use the actual Google Client ID and Enoki
-      console.log('Sign in initiated...');
-      console.log('Note: This is a demo implementation.');
-      console.log('For production, configure a Google OAuth Client ID.');
+      console.log('Sign in with:', selectedAccount);
+      console.log('🎭 Demo Mode: Simulating authentication...');
 
       // Simulate successful authentication after a delay
-      // In production, this would redirect to Google OAuth
       setTimeout(() => {
         // Simulate callback with mock data
-        const mockAddress = generateMockSuiAddress(nonce);
+        const mockAddress = generateMockSuiAddress(nonce + selectedAccount);
         const mockSession = {
           address: mockAddress,
           provider: 'google',
+          email: selectedAccount,
           nonce: nonce,
           timestamp: Date.now(),
         };
@@ -73,7 +78,8 @@ export function useEnokiAuth() {
         localStorage.setItem('zklogin_address', mockAddress);
         localStorage.setItem('zklogin_session', JSON.stringify(mockSession));
         
-        console.log('Demo authentication successful!');
+        console.log('✅ Demo authentication successful!');
+        console.log('Account:', selectedAccount);
         console.log('Mock Sui address:', mockAddress);
         
         setIsLoading(false);
@@ -157,9 +163,12 @@ export function useEnokiAuth() {
     isLoading,
     error,
     zkLoginSession,
+    showGoogleModal,
     
     // Actions
     signInWithGoogle,
+    completeGoogleSignIn,
+    setShowGoogleModal,
     signOut,
     handleRedirect,
   };
